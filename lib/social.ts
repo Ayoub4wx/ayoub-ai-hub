@@ -28,7 +28,7 @@ async function fetchTikTokThumbnail(url: string): Promise<TikTokPost | null> {
             title: data.title,
             authorName: data.author_name,
         }
-    } catch (error) {
+    } catch {
         console.warn('TikTok oEmbed error for', url)
         return null
     }

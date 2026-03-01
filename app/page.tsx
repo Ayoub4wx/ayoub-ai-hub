@@ -4,7 +4,7 @@ import NewsHighlights from '@/components/home/NewsHighlights'
 import CallToAction from '@/components/home/CallToAction'
 import { fetchAllNews } from '@/lib/rss'
 import { fetchTikTokVideos, fetchInstagramPosts } from '@/lib/social'
-import { YouTubeVideo, TikTokPost, InstagramPost } from '@/types/social'
+import { YouTubeVideo } from '@/types/social'
 
 export const revalidate = 900 // ISR: re-generate every 15 mins
 
