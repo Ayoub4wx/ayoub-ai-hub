@@ -32,7 +32,7 @@ async function getOrCreateBotId(supabase: ReturnType<typeof createClient>): Prom
     .eq('username', BOT_USERNAME)
     .single()
 
-  if (existing) return existing.id as string
+  if (existing) return (existing as { id: string }).id
 
   // Create a real Supabase Auth user for the bot (needed for FK constraint on profiles)
   const { data: authData, error: authError } = await supabase.auth.admin.createUser({
