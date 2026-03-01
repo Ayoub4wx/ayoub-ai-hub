@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import Parser from 'rss-parser'
 
 export const dynamic = 'force-dynamic'
@@ -24,7 +24,8 @@ const FREE_MODELS = [
   'meta-llama/llama-3.3-70b-instruct:free',
 ]
 
-async function getOrCreateBotId(supabase: ReturnType<typeof createClient>): Promise<string> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function getOrCreateBotId(supabase: SupabaseClient<any>): Promise<string> {
   // Check if bot profile already exists by username
   const { data: existing } = await supabase
     .from('profiles')
