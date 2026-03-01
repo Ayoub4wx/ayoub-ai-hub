@@ -52,13 +52,8 @@ async function getOrCreateBotId(supabase: ReturnType<typeof createClient>): Prom
 
   // Upsert profile with correct bot details
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await supabase.from('profiles').upsert({
-    id: botId,
-    username: BOT_USERNAME,
-    display_name: BOT_DISPLAY_NAME,
-    bio: BOT_BIO,
-    avatar_url: BOT_AVATAR,
-  } as any)
+  const profileRow: any = { id: botId, username: BOT_USERNAME, display_name: BOT_DISPLAY_NAME, bio: BOT_BIO, avatar_url: BOT_AVATAR }
+  await supabase.from('profiles').upsert(profileRow)
 
   return botId
 }
@@ -181,14 +176,10 @@ export async function GET(request: Request) {
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const postRow: any = { author_id: botId, title: post.title.slice(0, 200), content: post.content, tags: post.tags.slice(0, 5) }
     const { data: inserted, error: insertError } = await supabase
       .from('posts')
-      .insert({
-        author_id: botId,
-        title: post.title.slice(0, 200),
-        content: post.content,
-        tags: post.tags.slice(0, 5),
-      } as any)
+      .insert(postRow)
       .select('id')
       .single()
 
