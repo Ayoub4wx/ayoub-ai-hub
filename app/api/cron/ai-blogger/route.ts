@@ -51,13 +51,14 @@ async function getOrCreateBotId(supabase: ReturnType<typeof createClient>): Prom
   await new Promise((r) => setTimeout(r, 600))
 
   // Upsert profile with correct bot details
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await supabase.from('profiles').upsert({
     id: botId,
     username: BOT_USERNAME,
     display_name: BOT_DISPLAY_NAME,
     bio: BOT_BIO,
     avatar_url: BOT_AVATAR,
-  })
+  } as any)
 
   return botId
 }
@@ -179,6 +180,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'AI generation failed — all models returned unusable output' }, { status: 500 })
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: inserted, error: insertError } = await supabase
       .from('posts')
       .insert({
@@ -186,7 +188,7 @@ export async function GET(request: Request) {
         title: post.title.slice(0, 200),
         content: post.content,
         tags: post.tags.slice(0, 5),
-      })
+      } as any)
       .select('id')
       .single()
 
@@ -196,7 +198,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       success: true,
-      postId: inserted.id,
+      postId: (inserted as { id: string } | null)?.id,
       title: post.title,
       tags: post.tags,
     })
