@@ -8,6 +8,7 @@ export const NAV_LINKS: NavLink[] = [
   { label: 'News', href: '/news' },
   { label: 'Community', href: '/community' },
   { label: 'Ask AI', href: '/ask-ai' },
+  { label: 'Marketing', href: '/marketing-agent' },
   { label: 'Game', href: '/game' },
   { label: 'About', href: '/about' },
   { label: 'Projects', href: '/projects' },
