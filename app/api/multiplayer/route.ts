@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { createClient as createAdmin } from '@supabase/supabase-js'
+import { createClient as createAdmin, SupabaseClient } from '@supabase/supabase-js'
 import { TRIVIA_QUESTIONS, shuffleQuestions } from '@/lib/trivia-questions'
 import { TriviaQuestion } from '@/types/game'
+import { User } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,6 +12,28 @@ function createAdminClient() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
+}
+
+// Ensures a profiles row exists — the on_auth_user_created trigger can silently
+// fail (EXCEPTION WHEN OTHERS THEN RETURN NEW), leaving auth.users without a
+// corresponding profiles row and causing FK violations when creating game rooms.
+async function ensureProfile(admin: SupabaseClient, user: User) {
+  const { data: existing } = await admin
+    .from('profiles')
+    .select('id')
+    .eq('id', user.id)
+    .maybeSingle()
+  if (existing) return
+
+  const emailLocal = (user.email?.split('@')[0] ?? 'player')
+    .toLowerCase()
+    .replace(/[^a-z0-9_]/g, '')
+  // Use UUID suffix to guarantee uniqueness
+  const username = `${emailLocal || 'player'}_${user.id.replace(/-/g, '').substring(0, 8)}`
+  const displayName = (user.user_metadata?.full_name as string | undefined)
+    || emailLocal
+    || 'Player'
+  await admin.from('profiles').insert({ id: user.id, username, display_name: displayName })
 }
 
 function generateCode(): string {
@@ -39,6 +62,8 @@ export async function POST(request: NextRequest) {
   const questions = shuffleQuestions(pool, 10)
 
   const admin = createAdminClient()
+  await ensureProfile(admin, user)
+
   let code = generateCode()
   for (let i = 0; i < 5; i++) {
     const { data: existing } = await admin
@@ -101,6 +126,7 @@ export async function PATCH(request: NextRequest) {
     if (room.guest_id) return NextResponse.json({ error: 'Room is full' }, { status: 400 })
     if (room.status !== 'waiting') return NextResponse.json({ error: 'Game already started' }, { status: 400 })
 
+    await ensureProfile(admin, user)
     await admin.from('game_rooms').update({ guest_id: user.id }).eq('room_code', code)
     return NextResponse.json({ role: 'guest' })
   }
