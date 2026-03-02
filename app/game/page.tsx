@@ -2,14 +2,31 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { TriviaQuestion, GameState } from '@/types/game'
-import { Trophy, Timer, Zap, RotateCcw, Share2, ChevronRight, Star } from 'lucide-react'
+import { Trophy, Timer, Zap, RotateCcw, Share2, ChevronRight, Star, Flame, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
+import { createClient } from '@/lib/supabase/client'
+import Link from 'next/link'
 
 const TIMER_SECONDS = 20
 const QUESTIONS_PER_GAME = 10
+
+const CATEGORIES = [
+  { id: 'all', label: 'Random Mix', icon: '🎲' },
+  { id: 'models', label: 'AI Models', icon: '🤖' },
+  { id: 'concepts', label: 'Concepts', icon: '🧠' },
+  { id: 'companies', label: 'Companies', icon: '🏢' },
+  { id: 'history', label: 'History', icon: '📜' },
+  { id: 'tools', label: 'Tools', icon: '🛠️' },
+  { id: 'image_ai', label: 'Image AI', icon: '🎨' },
+  { id: 'video_ai', label: 'Video AI', icon: '🎬' },
+  { id: 'coding_ai', label: 'Coding AI', icon: '💻' },
+  { id: 'ethics', label: 'AI Ethics', icon: '⚖️' },
+  { id: 'math', label: 'Math & ML', icon: '📐' },
+  { id: 'prompting', label: 'Prompting', icon: '✍️' },
+]
 
 function ProgressBar({ current, total }: { current: number; total: number }) {
   return (
@@ -24,7 +41,12 @@ function ProgressBar({ current, total }: { current: number; total: number }) {
 
 function TimerBar({ timeLeft, total }: { timeLeft: number; total: number }) {
   const pct = (timeLeft / total) * 100
-  const color = timeLeft <= 5 ? 'from-red-500 to-red-400' : timeLeft <= 10 ? 'from-yellow-500 to-orange-400' : 'from-cyan-500 to-violet-500'
+  const color =
+    timeLeft <= 5
+      ? 'from-red-500 to-red-400'
+      : timeLeft <= 10
+      ? 'from-yellow-500 to-orange-400'
+      : 'from-cyan-500 to-violet-500'
   return (
     <div className="w-full h-2 bg-secondary rounded-full overflow-hidden">
       <div
@@ -33,6 +55,16 @@ function TimerBar({ timeLeft, total }: { timeLeft: number; total: number }) {
       />
     </div>
   )
+}
+
+interface ScoreResult {
+  points_earned: number
+  breakdown: { base: number; daily_bonus: number; streak_bonus: number }
+  new_total: number
+  streak: number
+  best_score: number
+  new_badges: string[]
+  already_played: boolean
 }
 
 export default function GamePage() {
@@ -48,16 +80,40 @@ export default function GamePage() {
   const [bestScore, setBestScore] = useState(0)
   const [loading, setLoading] = useState(false)
   const [showExplanation, setShowExplanation] = useState(false)
+  const [selectedCategory, setSelectedCategory] = useState('all')
+  const [correctCount, setCorrectCount] = useState(0)
+  const [serverResult, setServerResult] = useState<ScoreResult | null>(null)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [userStreak, setUserStreak] = useState(0)
 
   useEffect(() => {
     const saved = localStorage.getItem('aiTriviaBestScore')
     if (saved) setBestScore(parseInt(saved))
-  }, [])
+
+    const supabase = createClient()
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return
+      setIsLoggedIn(true)
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('streak_count, best_trivia_score')
+        .eq('id', user.id)
+        .single()
+      if (profile) {
+        setUserStreak(profile.streak_count || 0)
+        if ((profile.best_trivia_score || 0) > bestScore) {
+          setBestScore(profile.best_trivia_score)
+        }
+      }
+    })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const startGame = async () => {
     setLoading(true)
+    setServerResult(null)
+    setCorrectCount(0)
     try {
-      const res = await fetch(`/api/game?count=${QUESTIONS_PER_GAME}`)
+      const res = await fetch(`/api/game?count=${QUESTIONS_PER_GAME}&category=${selectedCategory}`)
       const questions: TriviaQuestion[] = await res.json()
       setState({
         status: 'playing',
@@ -76,33 +132,57 @@ export default function GamePage() {
     }
   }
 
-  const handleAnswer = useCallback((answerIndex: number) => {
-    if (state.status !== 'playing' || state.selectedAnswer !== null) return
+  const handleAnswer = useCallback(
+    (answerIndex: number) => {
+      if (state.status !== 'playing' || state.selectedAnswer !== null) return
 
-    const question = state.questions[state.currentIndex]
-    const isCorrect = answerIndex === question.correctIndex
-    const newScore = isCorrect ? state.score + (state.streak >= 2 ? 15 : 10) : state.score
-    const newStreak = isCorrect ? state.streak + 1 : 0
+      const question = state.questions[state.currentIndex]
+      const isCorrect = answerIndex === question.correctIndex
+      const newScore = isCorrect ? state.score + (state.streak >= 2 ? 15 : 10) : state.score
+      const newStreak = isCorrect ? state.streak + 1 : 0
 
-    setState((prev) => ({
-      ...prev,
-      status: 'answered',
-      selectedAnswer: answerIndex,
-      score: newScore,
-      streak: newStreak,
-    }))
-    setShowExplanation(true)
-  }, [state])
+      if (isCorrect) setCorrectCount((prev) => prev + 1)
 
-  const nextQuestion = useCallback(() => {
+      setState((prev) => ({
+        ...prev,
+        status: 'answered',
+        selectedAnswer: answerIndex,
+        score: newScore,
+        streak: newStreak,
+      }))
+      setShowExplanation(true)
+    },
+    [state]
+  )
+
+  const nextQuestion = useCallback(async () => {
     const nextIndex = state.currentIndex + 1
     if (nextIndex >= state.questions.length) {
       // Game over
-      if (state.score > bestScore) {
-        setBestScore(state.score)
-        localStorage.setItem('aiTriviaBestScore', state.score.toString())
+      const finalScore = state.score
+      if (finalScore > bestScore) {
+        setBestScore(finalScore)
+        localStorage.setItem('aiTriviaBestScore', finalScore.toString())
       }
       setState((prev) => ({ ...prev, status: 'finished' }))
+
+      // Submit to server for points + streak + badges
+      if (isLoggedIn) {
+        try {
+          const res = await fetch('/api/game', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ score: finalScore, correct: correctCount, total: QUESTIONS_PER_GAME }),
+          })
+          const result: ScoreResult = await res.json()
+          if (res.ok) {
+            setServerResult(result)
+            if (result.streak) setUserStreak(result.streak)
+          }
+        } catch {
+          // Silent fail — localStorage score is still saved
+        }
+      }
     } else {
       setState((prev) => ({
         ...prev,
@@ -113,13 +193,13 @@ export default function GamePage() {
       }))
       setShowExplanation(false)
     }
-  }, [state, bestScore])
+  }, [state, bestScore, isLoggedIn, correctCount])
 
   // Timer countdown
   useEffect(() => {
     if (state.status !== 'playing') return
     if (state.timeLeft <= 0) {
-      handleAnswer(-1) // Time's up — wrong answer
+      handleAnswer(-1)
       return
     }
     const timer = setTimeout(() => {
@@ -134,17 +214,33 @@ export default function GamePage() {
   // ─── IDLE ───
   if (state.status === 'idle') {
     return (
-      <div className="max-w-2xl mx-auto px-4 py-16 text-center">
-        <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-violet-500 to-cyan-500 flex items-center justify-center mx-auto mb-6">
-          <span className="text-4xl">🧠</span>
-        </div>
-        <h1 className="text-4xl font-bold mb-3">
-          AI <span className="gradient-text">Trivia</span>
-        </h1>
-        <p className="text-muted-foreground mb-6 text-lg">
-          Test your AI & machine learning knowledge!
-        </p>
+      <div className="max-w-2xl mx-auto px-4 py-16">
+        <div className="text-center mb-10">
+          <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-violet-500 to-cyan-500 flex items-center justify-center mx-auto mb-6">
+            <span className="text-4xl">🧠</span>
+          </div>
+          <h1 className="text-4xl font-bold mb-3">
+            AI <span className="gradient-text">Trivia</span>
+          </h1>
+          <p className="text-muted-foreground mb-4 text-lg">
+            Test your AI & machine learning knowledge!
+          </p>
 
+          {/* Streak + login info */}
+          {isLoggedIn && userStreak > 0 && (
+            <div className="inline-flex items-center gap-2 bg-orange-500/10 border border-orange-500/20 text-orange-300 text-sm px-4 py-2 rounded-full mb-4">
+              <Flame className="w-4 h-4" />
+              {userStreak}-day streak! Keep it going.
+            </div>
+          )}
+          {!isLoggedIn && (
+            <p className="text-xs text-muted-foreground mb-4">
+              <Link href="/auth/login" className="text-violet-400 hover:underline">Sign in</Link> to save streaks, earn points & badges
+            </p>
+          )}
+        </div>
+
+        {/* Stats row */}
         <div className="grid grid-cols-3 gap-4 mb-8 text-center">
           <div className="bg-secondary/50 border border-border rounded-xl p-4">
             <p className="text-2xl font-bold gradient-text">{QUESTIONS_PER_GAME}</p>
@@ -160,21 +256,51 @@ export default function GamePage() {
           </div>
         </div>
 
-        <div className="bg-secondary/30 border border-border rounded-xl p-4 mb-8 text-left text-sm text-muted-foreground space-y-1.5">
+        {/* Category selector */}
+        <div className="mb-8">
+          <p className="text-sm font-semibold text-muted-foreground mb-3">Choose Category</p>
+          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+            {CATEGORIES.map((cat) => (
+              <button
+                key={cat.id}
+                onClick={() => setSelectedCategory(cat.id)}
+                className={cn(
+                  'flex flex-col items-center gap-1 p-3 rounded-xl border text-xs font-medium transition-all',
+                  selectedCategory === cat.id
+                    ? 'border-violet-500 bg-violet-500/20 text-violet-300'
+                    : 'border-border bg-secondary/40 text-muted-foreground hover:border-border/80 hover:bg-secondary/60'
+                )}
+              >
+                <span className="text-xl">{cat.icon}</span>
+                {cat.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-secondary/30 border border-border rounded-xl p-4 mb-8 text-sm text-muted-foreground space-y-1.5">
           <p>✅ 10 points per correct answer</p>
           <p>🔥 Streak bonus: +5 points when on 2+ streak</p>
           <p>⏱ Answer before time runs out</p>
-          <p>📚 Topics: Models, History, Companies, Concepts, Tools</p>
+          {isLoggedIn && <p>⭐ Earn hub points + daily streak + badges for playing!</p>}
         </div>
 
-        <Button
-          onClick={startGame}
-          disabled={loading}
-          size="lg"
-          className="bg-gradient-to-r from-violet-600 to-cyan-600 hover:from-violet-500 hover:to-cyan-500 text-white border-0 gap-2 h-12 px-8 text-base"
-        >
-          {loading ? 'Loading...' : '🎮 Start Game'}
-        </Button>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <Button
+            onClick={startGame}
+            disabled={loading}
+            size="lg"
+            className="flex-1 bg-gradient-to-r from-violet-600 to-cyan-600 hover:from-violet-500 hover:to-cyan-500 text-white border-0 gap-2 h-12 text-base"
+          >
+            {loading ? 'Loading...' : '🎮 Start Game'}
+          </Button>
+          <Link href="/game/multiplayer" className="flex-1">
+            <Button size="lg" variant="outline" className="w-full gap-2 h-12 border-border">
+              <Users className="w-4 h-4" />
+              Multiplayer
+            </Button>
+          </Link>
+        </div>
       </div>
     )
   }
@@ -183,18 +309,23 @@ export default function GamePage() {
   if (state.status === 'finished') {
     const percentage = Math.round((state.score / maxScore) * 100)
     const grade =
-      percentage >= 90 ? { label: 'AI Expert!', emoji: '🏆', color: 'text-yellow-400' }
-      : percentage >= 70 ? { label: 'AI Enthusiast!', emoji: '🌟', color: 'text-cyan-400' }
-      : percentage >= 50 ? { label: 'Getting There!', emoji: '📚', color: 'text-violet-400' }
-      : { label: 'Keep Learning!', emoji: '💪', color: 'text-muted-foreground' }
+      percentage >= 90
+        ? { label: 'AI Expert!', emoji: '🏆', color: 'text-yellow-400' }
+        : percentage >= 70
+        ? { label: 'AI Enthusiast!', emoji: '🌟', color: 'text-cyan-400' }
+        : percentage >= 50
+        ? { label: 'Getting There!', emoji: '📚', color: 'text-violet-400' }
+        : { label: 'Keep Learning!', emoji: '💪', color: 'text-muted-foreground' }
 
     return (
       <div className="max-w-lg mx-auto px-4 py-16 text-center">
         <div className="text-6xl mb-4">{grade.emoji}</div>
         <h2 className={`text-3xl font-bold mb-2 ${grade.color}`}>{grade.label}</h2>
-        <p className="text-muted-foreground mb-8">You scored {state.score} out of {maxScore} possible points</p>
+        <p className="text-muted-foreground mb-6">
+          You scored {state.score} out of {maxScore} possible points
+        </p>
 
-        <Card className="border-border bg-secondary/30 mb-6">
+        <Card className="border-border bg-secondary/30 mb-5">
           <CardContent className="p-6">
             <div className="grid grid-cols-3 gap-4 text-center">
               <div>
@@ -212,6 +343,38 @@ export default function GamePage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Server points result */}
+        {serverResult && !serverResult.already_played && (
+          <div className="bg-violet-500/10 border border-violet-500/30 rounded-xl p-4 mb-5 text-left">
+            <p className="text-sm font-semibold text-violet-300 mb-2">
+              +{serverResult.points_earned} points earned!
+            </p>
+            <div className="text-xs text-muted-foreground space-y-0.5">
+              <p>Score bonus: +{serverResult.breakdown.base}</p>
+              <p>Daily bonus: +{serverResult.breakdown.daily_bonus}</p>
+              <p>Streak bonus ({serverResult.streak}🔥): +{serverResult.breakdown.streak_bonus}</p>
+            </div>
+            {serverResult.new_badges.length > 0 && (
+              <div className="mt-3 pt-3 border-t border-violet-500/20">
+                <p className="text-xs font-semibold text-yellow-400 mb-1">New badges unlocked!</p>
+                <div className="flex flex-wrap gap-1">
+                  {serverResult.new_badges.map((b) => (
+                    <span key={b} className="text-xs bg-yellow-400/10 border border-yellow-400/20 text-yellow-300 px-2 py-0.5 rounded-full">
+                      {b.replace(/_/g, ' ')}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {serverResult?.already_played && (
+          <p className="text-xs text-muted-foreground mb-5">
+            Already played today — come back tomorrow for your daily streak bonus!
+          </p>
+        )}
 
         <div className="flex gap-3 justify-center">
           <Button
@@ -262,11 +425,19 @@ export default function GamePage() {
           )}
         </div>
         <div className="flex items-center gap-2">
-          <Timer className={cn('w-4 h-4', state.timeLeft <= 5 ? 'text-red-400' : 'text-muted-foreground')} />
-          <span className={cn(
-            'text-sm font-mono font-bold',
-            state.timeLeft <= 5 ? 'text-red-400' : state.timeLeft <= 10 ? 'text-yellow-400' : 'text-muted-foreground'
-          )}>
+          <Timer
+            className={cn('w-4 h-4', state.timeLeft <= 5 ? 'text-red-400' : 'text-muted-foreground')}
+          />
+          <span
+            className={cn(
+              'text-sm font-mono font-bold',
+              state.timeLeft <= 5
+                ? 'text-red-400'
+                : state.timeLeft <= 10
+                ? 'text-yellow-400'
+                : 'text-muted-foreground'
+            )}
+          >
             {state.timeLeft}s
           </span>
         </div>
@@ -298,16 +469,17 @@ export default function GamePage() {
           const isCorrect = i === question.correctIndex
           const isAnswered = state.status === 'answered'
 
-          let className = 'w-full text-left p-4 rounded-xl border transition-all duration-200 flex items-center gap-3 text-sm font-medium'
+          let cls =
+            'w-full text-left p-4 rounded-xl border transition-all duration-200 flex items-center gap-3 text-sm font-medium'
 
           if (!isAnswered) {
-            className += ' border-border bg-secondary/50 hover:bg-secondary hover:border-primary/50 cursor-pointer'
+            cls += ' border-border bg-secondary/50 hover:bg-secondary hover:border-primary/50 cursor-pointer'
           } else if (isCorrect) {
-            className += ' border-green-500 bg-green-500/20 text-green-300'
+            cls += ' border-green-500 bg-green-500/20 text-green-300'
           } else if (isSelected && !isCorrect) {
-            className += ' border-red-500 bg-red-500/20 text-red-300'
+            cls += ' border-red-500 bg-red-500/20 text-red-300'
           } else {
-            className += ' border-border bg-secondary/30 opacity-50'
+            cls += ' border-border bg-secondary/30 opacity-50'
           }
 
           return (
@@ -315,14 +487,18 @@ export default function GamePage() {
               key={i}
               onClick={() => handleAnswer(i)}
               disabled={isAnswered}
-              className={className}
+              className={cls}
             >
-              <span className={cn(
-                'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0',
-                isAnswered && isCorrect ? 'bg-green-500 text-white'
-                : isAnswered && isSelected && !isCorrect ? 'bg-red-500 text-white'
-                : 'bg-secondary text-muted-foreground'
-              )}>
+              <span
+                className={cn(
+                  'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0',
+                  isAnswered && isCorrect
+                    ? 'bg-green-500 text-white'
+                    : isAnswered && isSelected && !isCorrect
+                    ? 'bg-red-500 text-white'
+                    : 'bg-secondary text-muted-foreground'
+                )}
+              >
                 {String.fromCharCode(65 + i)}
               </span>
               {option}
@@ -336,7 +512,9 @@ export default function GamePage() {
       {showExplanation && (
         <Card className="border-border bg-secondary/20 mb-5">
           <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-1.5">Explanation</p>
+            <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-1.5">
+              Explanation
+            </p>
             <p className="text-sm leading-relaxed">{question.explanation}</p>
           </CardContent>
         </Card>

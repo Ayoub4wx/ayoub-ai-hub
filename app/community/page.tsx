@@ -84,6 +84,7 @@ export default function CommunityPage() {
   const [hasMore, setHasMore] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [newPostsCount, setNewPostsCount] = useState(0)
 
   const fetchPosts = async (pageNum = 1, append = false) => {
     if (pageNum === 1) setLoading(true)
@@ -110,7 +111,20 @@ export default function CommunityPage() {
 
   useEffect(() => {
     fetchPosts(1)
-    createClient().auth.getUser().then(({ data: { user } }) => setIsLoggedIn(!!user))
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data: { user } }) => setIsLoggedIn(!!user))
+
+    // Real-time: listen for new posts
+    const channel = supabase
+      .channel('community-feed-rt')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'posts' },
+        () => setNewPostsCount((prev) => prev + 1)
+      )
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
   }, [])
 
   const loadMore = () => {
@@ -138,6 +152,16 @@ export default function CommunityPage() {
               </Button>
             </Link>
           </div>
+
+          {/* Real-time new posts banner */}
+          {newPostsCount > 0 && (
+            <button
+              onClick={() => { fetchPosts(1); setNewPostsCount(0); setPage(1) }}
+              className="w-full py-2 bg-violet-600 hover:bg-violet-500 text-white text-sm rounded-lg mb-4 transition-colors animate-pulse"
+            >
+              ✨ {newPostsCount} new post{newPostsCount > 1 ? 's' : ''} — Click to refresh
+            </button>
+          )}
 
           {loading ? (
             <div className="space-y-4">

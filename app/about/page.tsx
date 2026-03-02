@@ -1,7 +1,7 @@
 import { Metadata } from 'next'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Youtube, Instagram, Bot, Rss, Users, Gamepad2 } from 'lucide-react'
+import { Youtube, Instagram, Bot, Rss, Users, Gamepad2, Coffee, Heart } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -124,6 +124,34 @@ export default function AboutPage() {
                 <p className="text-sm text-muted-foreground">@ayoub.env</p>
               </CardContent>
             </Card>
+          </a>
+        </div>
+      </div>
+
+      {/* Support My Work */}
+      <div className="mb-16">
+        <h2 className="text-2xl font-bold mb-2">Support My Work</h2>
+        <p className="text-muted-foreground mb-5">
+          If you enjoy the content and find this hub useful, consider buying me a coffee. It helps me keep creating and building for free.
+        </p>
+        <div className="flex flex-wrap gap-4">
+          <a
+            href="https://ko-fi.com/ayoubai"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 bg-yellow-400 hover:bg-yellow-300 text-black font-semibold px-6 py-3 rounded-full shadow transition-all hover:scale-105"
+          >
+            <Coffee className="w-4 h-4" />
+            Buy me a coffee on Ko-fi
+          </a>
+          <a
+            href="https://github.com/sponsors/ayoubai"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 border border-pink-500/30 hover:bg-pink-500/10 text-pink-400 font-medium px-6 py-3 rounded-full transition-all"
+          >
+            <Heart className="w-4 h-4" />
+            Sponsor on GitHub
           </a>
         </div>
       </div>

@@ -1,12 +1,13 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { User, Calendar, FileText, Edit } from 'lucide-react'
+import { User, Calendar, FileText, Edit, Flame, Coins } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { createClient } from '@/lib/supabase/server'
 import { formatDate } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 
 interface Props {
   params: { username: string }
@@ -16,6 +17,13 @@ export async function generateMetadata({ params }: Props) {
   return {
     title: `@${params.username} — Ayoub AI Hub`,
   }
+}
+
+const TIER_STYLES: Record<string, string> = {
+  bronze: 'border-amber-600/60 bg-amber-950/40 text-amber-300',
+  silver: 'border-slate-400/50 bg-slate-800/40 text-slate-300',
+  gold: 'border-yellow-400/60 bg-yellow-950/40 text-yellow-300',
+  diamond: 'border-cyan-400/60 bg-cyan-950/40 text-cyan-300',
 }
 
 export default async function ProfilePage({ params }: Props) {
@@ -29,25 +37,40 @@ export default async function ProfilePage({ params }: Props) {
 
   if (!profile) notFound()
 
-  // Get user's posts
-  const { data: posts } = await supabase
-    .from('posts')
-    .select(`
-      id, title, content, tags, created_at, view_count,
-      likes:likes(count),
-      comments:comments(count)
-    `)
-    .eq('author_id', profile.id)
-    .eq('is_deleted', false)
-    .order('created_at', { ascending: false })
-    .limit(10)
+  // Fetch posts, badges in parallel
+  const [postsResult, userBadgesResult] = await Promise.all([
+    supabase
+      .from('posts')
+      .select(`
+        id, title, content, tags, created_at, view_count,
+        likes:likes(count),
+        comments:comments(count)
+      `)
+      .eq('author_id', profile.id)
+      .eq('is_deleted', false)
+      .order('created_at', { ascending: false })
+      .limit(10),
+    supabase
+      .from('user_badges')
+      .select('badge_id, earned_at, badges(id, name, description, icon, tier)')
+      .eq('user_id', profile.id)
+      .order('earned_at', { ascending: false }),
+  ])
+
+  const posts = postsResult.data
+  const userBadges = userBadgesResult.data || []
 
   // Check if viewer is the profile owner
   const { data: { user } } = await supabase.auth.getUser()
   const isOwner = user?.id === profile.id
 
-  const avatarSrc = profile.avatar_url ||
+  const avatarSrc =
+    profile.avatar_url ||
     `https://api.dicebear.com/8.x/initials/svg?seed=${profile.display_name || profile.username}`
+
+  const frameClass = profile.equipped_frame || ''
+  const nameColorClass = profile.equipped_name_color || ''
+  const equippedBadge = profile.equipped_badge || ''
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-10">
@@ -55,8 +78,13 @@ export default async function ProfilePage({ params }: Props) {
       <Card className="border-border bg-secondary/20 mb-6">
         <CardContent className="p-6">
           <div className="flex items-start gap-5">
-            {/* Avatar */}
-            <div className="relative w-20 h-20 rounded-full overflow-hidden border-2 border-border bg-secondary flex-shrink-0">
+            {/* Avatar with equipped frame */}
+            <div
+              className={cn(
+                'relative w-20 h-20 rounded-full overflow-hidden border-2 border-border bg-secondary flex-shrink-0',
+                frameClass
+              )}
+            >
               <Image
                 src={avatarSrc}
                 alt={profile.display_name || profile.username}
@@ -70,8 +98,9 @@ export default async function ProfilePage({ params }: Props) {
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div>
-                  <h1 className="text-2xl font-bold truncate">
+                  <h1 className={cn('text-2xl font-bold truncate flex items-center gap-1.5', nameColorClass)}>
                     {profile.display_name || profile.username}
+                    {equippedBadge && <span className="text-base">{equippedBadge}</span>}
                   </h1>
                   <p className="text-muted-foreground text-sm">@{profile.username}</p>
                 </div>
@@ -89,7 +118,7 @@ export default async function ProfilePage({ params }: Props) {
                 <p className="text-sm text-muted-foreground mt-3 leading-relaxed">{profile.bio}</p>
               )}
 
-              <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-3 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1">
                   <Calendar className="w-3.5 h-3.5" />
                   Joined {formatDate(profile.created_at)}
@@ -98,11 +127,56 @@ export default async function ProfilePage({ params }: Props) {
                   <FileText className="w-3.5 h-3.5" />
                   {posts?.length || 0} posts
                 </span>
+                {(profile.points ?? 0) > 0 && (
+                  <span className="flex items-center gap-1 text-yellow-400">
+                    <Coins className="w-3.5 h-3.5" />
+                    {(profile.points as number).toLocaleString()} points
+                  </span>
+                )}
+                {(profile.streak_count ?? 0) > 0 && (
+                  <span className="flex items-center gap-1 text-orange-400">
+                    <Flame className="w-3.5 h-3.5" />
+                    {profile.streak_count}-day streak
+                  </span>
+                )}
+                {(profile.best_trivia_score ?? 0) > 0 && (
+                  <span className="text-violet-400">
+                    🏆 Best: {profile.best_trivia_score}/150
+                  </span>
+                )}
               </div>
             </div>
           </div>
         </CardContent>
       </Card>
+
+      {/* Badges */}
+      {userBadges.length > 0 && (
+        <div className="mb-8">
+          <h2 className="text-lg font-semibold mb-4">Badges</h2>
+          <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
+            {userBadges.map((ub) => {
+              const badge = ub.badges as unknown as {
+                id: string; name: string; description: string; icon: string; tier: string
+              }
+              if (!badge) return null
+              return (
+                <div
+                  key={badge.id}
+                  title={`${badge.name}: ${badge.description}`}
+                  className={cn(
+                    'border-2 rounded-xl p-2 text-center cursor-help transition-transform hover:scale-110',
+                    TIER_STYLES[badge.tier] || TIER_STYLES.bronze
+                  )}
+                >
+                  <div className="text-xl">{badge.icon}</div>
+                  <div className="text-xs mt-0.5 truncate leading-tight">{badge.name}</div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Posts */}
       <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">

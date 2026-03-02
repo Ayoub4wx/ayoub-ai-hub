@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { awardPoints, checkAndAwardBadges } from '@/lib/badges'
 
 export async function POST(request: NextRequest) {
   try {
@@ -47,6 +48,20 @@ export async function POST(request: NextRequest) {
         : supabase.from('likes').select('id', { count: 'exact' }).eq('comment_id', comment_id).is('post_id', null)
 
       const { count } = await countQuery
+
+      // Award 2 points to the post owner (not the liker)
+      if (post_id) {
+        const { data: post } = await supabase
+          .from('posts')
+          .select('author_id')
+          .eq('id', post_id)
+          .single()
+        if (post && post.author_id !== user.id) {
+          awardPoints(post.author_id, 2, 'received_like', supabase)
+          checkAndAwardBadges(post.author_id, supabase)
+        }
+      }
+
       return NextResponse.json({ liked: true, count: count || 0 })
     }
   } catch (error) {

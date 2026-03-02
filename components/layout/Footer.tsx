@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
-import { Bot, Youtube, Instagram } from 'lucide-react'
+import { Bot, Youtube, Instagram, Coffee } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useToast } from '@/hooks/use-toast'
@@ -45,6 +45,19 @@ export default function Footer() {
   }
 
   return (
+    <>
+      {/* Ko-fi floating button */}
+      <a
+        href="https://ko-fi.com/ayoubai"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-yellow-400 hover:bg-yellow-300 text-black font-semibold px-4 py-2.5 rounded-full shadow-lg transition-all hover:scale-105 text-sm"
+        aria-label="Support on Ko-fi"
+      >
+        <Coffee className="w-4 h-4" />
+        Support Me
+      </a>
+
     <footer className="border-t border-border bg-background/50 backdrop-blur-sm mt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-10">
@@ -85,8 +98,10 @@ export default function Footer() {
                 { label: 'Ask AI', href: '/ask-ai' },
                 { label: 'Community', href: '/community' },
                 { label: 'AI Game', href: '/game' },
+                { label: 'Resources', href: '/resources' },
+                { label: 'Developer API', href: '/developer' },
+                { label: 'Shop', href: '/shop' },
                 { label: 'About', href: '/about' },
-                { label: 'Projects', href: '/projects' },
                 { label: 'Contact', href: '/contact' },
               ].map((link) => (
                 <li key={link.href}>
@@ -132,6 +147,19 @@ export default function Footer() {
             </div>
 
             <div className="mt-6 space-y-2">
+              <h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">Support</h3>
+              <a
+                href="https://ko-fi.com/ayoubai"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-yellow-400 transition-colors"
+              >
+                <Coffee className="w-3.5 h-3.5" />
+                Buy me a coffee
+              </a>
+            </div>
+
+            <div className="mt-4 space-y-2">
               <h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">Legal</h3>
               <Link href="/terms" className="block text-sm text-muted-foreground hover:text-foreground transition-colors">
                 Terms of Service
@@ -153,5 +181,6 @@ export default function Footer() {
         </div>
       </div>
     </footer>
+    </>
   )
 }

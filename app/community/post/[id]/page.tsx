@@ -29,7 +29,50 @@ export default function PostDetailPage() {
   useEffect(() => {
     const supabase = createClient()
     supabase.auth.getUser().then(({ data }) => setUser(data.user ? { id: data.user.id } : null))
-  }, [])
+
+    // Real-time: new comments on this post
+    const commentsChannel = supabase
+      .channel(`post-comments-rt:${id}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'comments', filter: `post_id=eq.${id}` },
+        async (payload) => {
+          const { data: newComment } = await supabase
+            .from('comments')
+            .select('*, author:profiles!comments_author_id_fkey(id, username, display_name, avatar_url)')
+            .eq('id', payload.new.id)
+            .single()
+          if (newComment) {
+            setPost((prev) =>
+              prev ? { ...prev, comments: [...(prev.comments || []), newComment] } : prev
+            )
+          }
+        }
+      )
+      .subscribe()
+
+    // Real-time: like count changes on this post
+    const likesChannel = supabase
+      .channel(`post-likes-rt:${id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'likes', filter: `post_id=eq.${id}` },
+        async () => {
+          const { count } = await supabase
+            .from('likes')
+            .select('id', { count: 'exact', head: true })
+            .eq('post_id', id)
+            .is('comment_id', null)
+          setLikeCount(count || 0)
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(commentsChannel)
+      supabase.removeChannel(likesChannel)
+    }
+  }, [id])
 
   useEffect(() => {
     fetch(`/api/community/posts/${id}`)

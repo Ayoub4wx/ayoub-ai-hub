@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { awardPoints, checkAndAwardBadges } from '@/lib/badges'
 
 export async function POST(request: NextRequest) {
   try {
@@ -35,6 +36,10 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) throw error
+
+    // Award 1 point for commenting + check badges
+    awardPoints(user.id, 1, 'leave_comment', supabase)
+    checkAndAwardBadges(user.id, supabase)
 
     return NextResponse.json(comment, { status: 201 })
   } catch (error) {

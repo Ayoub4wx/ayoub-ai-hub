@@ -58,23 +58,26 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
-    const updates: Record<string, string> = { updated_at: new Date().toISOString() }
-    if (username !== undefined) updates.username = username
-    if (display_name !== undefined) updates.display_name = display_name.slice(0, 80)
-    if (bio !== undefined) updates.bio = bio.slice(0, 300)
-    if (avatar_url !== undefined) updates.avatar_url = avatar_url
+    const upsertData: Record<string, string> = {
+      id: user.id,
+      updated_at: new Date().toISOString(),
+    }
+    if (username !== undefined) upsertData.username = username
+    if (display_name !== undefined) upsertData.display_name = display_name.slice(0, 80)
+    if (bio !== undefined) upsertData.bio = bio.slice(0, 300)
+    if (avatar_url !== undefined) upsertData.avatar_url = avatar_url
 
     const { data: profile, error } = await supabase
       .from('profiles')
-      .update(updates)
-      .eq('id', user.id)
+      .upsert(upsertData, { onConflict: 'id' })
       .select()
       .single()
 
     if (error) throw error
 
     return NextResponse.json(profile)
-  } catch {
+  } catch (err) {
+    console.error('[profile PATCH]', err)
     return NextResponse.json({ error: 'Failed to update profile' }, { status: 500 })
   }
 }

@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { Youtube, Instagram, Bot, Users, Rss, ChevronRight } from 'lucide-react'
+import { Youtube, Instagram, Bot, Users, Rss, ChevronRight, Coffee } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 
@@ -86,6 +86,19 @@ export default function HeroSection() {
                   AI News
                 </Button>
               </Link>
+            </div>
+
+            {/* Ko-fi support button */}
+            <div className="mb-6 flex justify-center lg:justify-start">
+              <a
+                href="https://ko-fi.com/ayoubai"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 bg-yellow-400/10 hover:bg-yellow-400/20 border border-yellow-400/30 hover:border-yellow-400/60 text-yellow-300 text-sm font-medium px-4 py-2 rounded-full transition-all"
+              >
+                <Coffee className="w-3.5 h-3.5" />
+                Support my work on Ko-fi
+              </a>
             </div>
 
             {/* Social links */}

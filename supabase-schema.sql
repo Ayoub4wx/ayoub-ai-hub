@@ -110,6 +110,9 @@ ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "profiles_public_read" ON profiles
   FOR SELECT USING (TRUE);
 
+CREATE POLICY "profiles_owner_insert" ON profiles
+  FOR INSERT WITH CHECK (auth.uid() = id);
+
 CREATE POLICY "profiles_owner_update" ON profiles
   FOR UPDATE USING (auth.uid() = id);
 
