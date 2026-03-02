@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
         limit: apiKey.daily_limit,
         used: requestsToday,
         reset: 'Resets at midnight UTC',
-        upgrade: 'https://ayoub-portfolio-site.netlify.app/developer#plans',
+        upgrade: 'https://ayoub-ai-hub-xhdx.vercel.app/developer#plans',
       },
       {
         status: 429,
@@ -69,8 +69,8 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  // Increment usage counter (fire-and-forget)
-  supabase
+  // Increment usage counter
+  await supabase
     .from('api_keys')
     .update({
       requests_today: requestsToday + 1,
