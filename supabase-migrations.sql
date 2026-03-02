@@ -178,4 +178,25 @@ CREATE POLICY "Players update game_rooms" ON game_rooms FOR UPDATE USING (
 );
 
 -- Enable real-time for game rooms
+-- REPLICA IDENTITY FULL is required for UPDATE events to work with non-PK filters
+ALTER TABLE game_rooms REPLICA IDENTITY FULL;
 ALTER PUBLICATION supabase_realtime ADD TABLE game_rooms;
+
+-- ─── LEADERBOARD SNAPSHOTS ───────────────────────────────────
+-- Weekly top-10 leaderboard archives (used by leaderboard-snapshot cron)
+CREATE TABLE IF NOT EXISTS leaderboard_snapshots (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  week_start  DATE NOT NULL,
+  rank        INTEGER NOT NULL,
+  user_id     UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  points      INTEGER NOT NULL,
+  username    TEXT NOT NULL,
+  created_at  TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(week_start, rank)
+);
+CREATE INDEX IF NOT EXISTS idx_leaderboard_week ON leaderboard_snapshots(week_start DESC);
+ALTER TABLE leaderboard_snapshots ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public read leaderboard_snapshots" ON leaderboard_snapshots;
+DROP POLICY IF EXISTS "Service insert leaderboard_snapshots" ON leaderboard_snapshots;
+CREATE POLICY "Public read leaderboard_snapshots" ON leaderboard_snapshots FOR SELECT USING (true);
+CREATE POLICY "Service insert leaderboard_snapshots" ON leaderboard_snapshots FOR INSERT WITH CHECK (true);

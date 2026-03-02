@@ -1,0 +1,68 @@
+name: Scheduled Cron Jobs
+
+# GitHub Actions triggers cron routes on Vercel using CRON_SECRET auth.
+# This works around Vercel Hobby's 2-cron limit — all maintenance jobs
+# are triggered externally while Vercel keeps the 2 content-generation crons.
+
+on:
+  schedule:
+    # All times are UTC
+    - cron: '0 0 * * *'   # midnight daily — api-key-reset
+    - cron: '0 1 * * *'   # 1 AM daily — game-room-cleanup
+    - cron: '0 2 * * 0'   # 2 AM Sunday — db-hygiene
+    - cron: '0 3 * * *'   # 3 AM daily — streak-reset
+    - cron: '0 4 * * *'   # 4 AM daily — badge-sweep
+    - cron: '0 7 * * *'   # 7 AM daily — rss-health (1hr before fetch-news)
+    - cron: '0 10 * * 1'  # 10 AM Monday — weekly-digest
+    - cron: '0 23 * * 0'  # 11 PM Sunday — leaderboard-snapshot
+  workflow_dispatch: # Allow manual trigger from GitHub UI
+
+jobs:
+  run-crons:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run scheduled cron routes
+        env:
+          SITE_URL: ${{ secrets.SITE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          HOUR=$(date -u +%H)
+          MINUTE=$(date -u +%M)
+          DOW=$(date -u +%u)  # 1=Monday ... 7=Sunday
+          BASE="$SITE_URL/api/cron"
+          AUTH="Authorization: Bearer $CRON_SECRET"
+
+          echo "Running at UTC $HOUR:$MINUTE (day of week: $DOW)"
+
+          call_cron() {
+            local name=$1
+            echo "→ Calling $name..."
+            response=$(curl -sf -w "\n%{http_code}" -H "$AUTH" "$BASE/$name" 2>&1) || true
+            echo "$response"
+          }
+
+          # Midnight (00): api-key-reset
+          [ "$HOUR" = "00" ] && call_cron "api-key-reset"
+
+          # 1 AM (01): game-room-cleanup
+          [ "$HOUR" = "01" ] && call_cron "game-room-cleanup"
+
+          # 2 AM Sunday (02 + DOW=7): db-hygiene
+          [ "$HOUR" = "02" ] && [ "$DOW" = "7" ] && call_cron "db-hygiene"
+
+          # 3 AM (03): streak-reset
+          [ "$HOUR" = "03" ] && call_cron "streak-reset"
+
+          # 4 AM (04): badge-sweep
+          [ "$HOUR" = "04" ] && call_cron "badge-sweep"
+
+          # 7 AM (07): rss-health
+          [ "$HOUR" = "07" ] && call_cron "rss-health"
+
+          # 10 AM Monday (10 + DOW=1): weekly-digest
+          [ "$HOUR" = "10" ] && [ "$DOW" = "1" ] && call_cron "weekly-digest"
+
+          # 11 PM Sunday (23 + DOW=7): leaderboard-snapshot
+          [ "$HOUR" = "23" ] && [ "$DOW" = "7" ] && call_cron "leaderboard-snapshot"
+
+          echo "Done."

@@ -168,6 +168,35 @@ export default function MultiplayerRoom() {
     return () => { supabase.removeChannel(channel) }
   }, [code]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Polling fallback — covers cases where realtime doesn't fire
+  useEffect(() => {
+    if (loading) return
+    // Poll faster in waiting room, slower during play
+    const interval = setInterval(async () => {
+      const res = await fetch(`/api/multiplayer?code=${code}`)
+      if (!res.ok) return
+      const data: GameRoom = await res.json()
+      setRoom((prev) => {
+        if (!prev) return data
+        // Trigger game start reset when transitioning waiting → playing
+        if (data.status === 'playing' && prevStatusRef.current === 'waiting') {
+          setQuestionIndex(0)
+          setSelectedAnswer(null)
+          setTimeLeft(TIMER_SECONDS)
+          setShowExplanation(false)
+          setMyScore(0)
+          answeredRef.current = false
+        }
+        if (data.status !== prevStatusRef.current) {
+          prevStatusRef.current = data.status
+        }
+        return data
+      })
+      if (data.host_id) fetchNames(data.host_id, data.guest_id)
+    }, 3000)
+    return () => clearInterval(interval)
+  }, [loading, code]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const submitAnswer = useCallback(
     async (answerIndex: number) => {
       if (answeredRef.current) return
