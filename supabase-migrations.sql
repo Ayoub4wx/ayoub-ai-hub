@@ -26,6 +26,8 @@ CREATE TABLE IF NOT EXISTS point_transactions (
 CREATE INDEX IF NOT EXISTS idx_point_tx_user ON point_transactions(user_id);
 CREATE INDEX IF NOT EXISTS idx_point_tx_created ON point_transactions(created_at DESC);
 ALTER TABLE point_transactions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users view own transactions" ON point_transactions;
+DROP POLICY IF EXISTS "Service insert transactions" ON point_transactions;
 CREATE POLICY "Users view own transactions" ON point_transactions FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Service insert transactions" ON point_transactions FOR INSERT WITH CHECK (true);
 
@@ -68,6 +70,8 @@ CREATE TABLE IF NOT EXISTS user_badges (
 );
 CREATE INDEX IF NOT EXISTS idx_user_badges_user ON user_badges(user_id);
 ALTER TABLE user_badges ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public read user_badges" ON user_badges;
+DROP POLICY IF EXISTS "Service insert user_badges" ON user_badges;
 CREATE POLICY "Public read user_badges" ON user_badges FOR SELECT USING (true);
 CREATE POLICY "Service insert user_badges" ON user_badges FOR INSERT WITH CHECK (true);
 
@@ -110,6 +114,8 @@ CREATE TABLE IF NOT EXISTS user_shop_items (
 );
 CREATE INDEX IF NOT EXISTS idx_user_shop_user ON user_shop_items(user_id);
 ALTER TABLE user_shop_items ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users view own shop items" ON user_shop_items;
+DROP POLICY IF EXISTS "Users manage own shop items" ON user_shop_items;
 CREATE POLICY "Users view own shop items" ON user_shop_items FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Users manage own shop items" ON user_shop_items FOR ALL USING (auth.uid() = user_id);
 
@@ -131,6 +137,11 @@ CREATE TABLE IF NOT EXISTS api_keys (
 CREATE INDEX IF NOT EXISTS idx_api_keys_hash ON api_keys(key_hash);
 CREATE INDEX IF NOT EXISTS idx_api_keys_user ON api_keys(user_id);
 ALTER TABLE api_keys ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users view own api_keys" ON api_keys;
+DROP POLICY IF EXISTS "Users create own api_keys" ON api_keys;
+DROP POLICY IF EXISTS "Users update own api_keys" ON api_keys;
+DROP POLICY IF EXISTS "Users delete own api_keys" ON api_keys;
+DROP POLICY IF EXISTS "Service update api_keys" ON api_keys;
 CREATE POLICY "Users view own api_keys" ON api_keys FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Users create own api_keys" ON api_keys FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users update own api_keys" ON api_keys FOR UPDATE USING (auth.uid() = user_id);
@@ -157,6 +168,9 @@ CREATE TABLE IF NOT EXISTS game_rooms (
 CREATE INDEX IF NOT EXISTS idx_rooms_code ON game_rooms(room_code);
 CREATE INDEX IF NOT EXISTS idx_rooms_created ON game_rooms(created_at DESC);
 ALTER TABLE game_rooms ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public read game_rooms" ON game_rooms;
+DROP POLICY IF EXISTS "Auth create game_rooms" ON game_rooms;
+DROP POLICY IF EXISTS "Players update game_rooms" ON game_rooms;
 CREATE POLICY "Public read game_rooms" ON game_rooms FOR SELECT USING (true);
 CREATE POLICY "Auth create game_rooms" ON game_rooms FOR INSERT WITH CHECK (auth.uid() = host_id);
 CREATE POLICY "Players update game_rooms" ON game_rooms FOR UPDATE USING (
