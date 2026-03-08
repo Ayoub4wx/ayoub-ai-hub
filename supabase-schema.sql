@@ -43,6 +43,16 @@ CREATE TABLE IF NOT EXISTS posts (
   author_id   UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   title       TEXT NOT NULL CHECK (LENGTH(title) BETWEEN 5 AND 200),
   content     TEXT NOT NULL CHECK (LENGTH(content) BETWEEN 10 AND 10000),
+  slug        TEXT UNIQUE,
+  excerpt     TEXT,
+  meta_description TEXT,
+  cover_image_url TEXT,
+  cover_image_alt TEXT,
+  source_url  TEXT,
+  source_title TEXT,
+  source_site_name TEXT,
+  source_image_url TEXT,
+  source_published_at TIMESTAMPTZ,
   tags        TEXT[] DEFAULT '{}',
   is_pinned   BOOLEAN DEFAULT FALSE,
   is_deleted  BOOLEAN DEFAULT FALSE,
@@ -54,6 +64,7 @@ CREATE TABLE IF NOT EXISTS posts (
 CREATE INDEX IF NOT EXISTS idx_posts_author ON posts(author_id);
 CREATE INDEX IF NOT EXISTS idx_posts_created ON posts(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_posts_tags ON posts USING GIN(tags);
+CREATE INDEX IF NOT EXISTS idx_posts_slug ON posts(slug);
 
 -- ─── COMMENTS ────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS comments (

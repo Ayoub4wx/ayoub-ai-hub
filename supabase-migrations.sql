@@ -200,3 +200,17 @@ DROP POLICY IF EXISTS "Public read leaderboard_snapshots" ON leaderboard_snapsho
 DROP POLICY IF EXISTS "Service insert leaderboard_snapshots" ON leaderboard_snapshots;
 CREATE POLICY "Public read leaderboard_snapshots" ON leaderboard_snapshots FOR SELECT USING (true);
 CREATE POLICY "Service insert leaderboard_snapshots" ON leaderboard_snapshots FOR INSERT WITH CHECK (true);
+
+-- SEO/blog metadata for richer AI Blogger posts
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS slug TEXT UNIQUE;
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS excerpt TEXT;
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS meta_description TEXT;
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS cover_image_url TEXT;
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS cover_image_alt TEXT;
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS source_url TEXT;
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS source_title TEXT;
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS source_site_name TEXT;
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS source_image_url TEXT;
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS source_published_at TIMESTAMPTZ;
+
+CREATE INDEX IF NOT EXISTS idx_posts_slug ON posts(slug);

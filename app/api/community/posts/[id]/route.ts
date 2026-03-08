@@ -7,6 +7,7 @@ export async function GET(
 ) {
   try {
     const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
 
     const { data: post, error } = await supabase
       .from('posts')
@@ -33,7 +34,22 @@ export async function GET(
       .update({ view_count: (post.view_count || 0) + 1 })
       .eq('id', params.id)
 
-    return NextResponse.json(post)
+    let userLiked = false
+    if (user) {
+      const { data: existingLike } = await supabase
+        .from('likes')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('post_id', params.id)
+        .is('comment_id', null)
+        .maybeSingle()
+      userLiked = !!existingLike
+    }
+
+    return NextResponse.json({
+      ...post,
+      user_liked: userLiked,
+    })
   } catch {
     return NextResponse.json({ error: 'Failed to fetch post' }, { status: 500 })
   }

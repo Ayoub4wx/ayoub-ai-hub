@@ -13,6 +13,16 @@ export interface Post {
   title: string
   content: string
   tags: string[]
+  slug?: string | null
+  excerpt?: string | null
+  meta_description?: string | null
+  cover_image_url?: string | null
+  cover_image_alt?: string | null
+  source_url?: string | null
+  source_title?: string | null
+  source_site_name?: string | null
+  source_image_url?: string | null
+  source_published_at?: string | null
   is_pinned: boolean
   is_deleted: boolean
   view_count: number

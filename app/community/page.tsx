@@ -45,8 +45,19 @@ function PostCard({ post }: { post: Post }) {
                 {post.title}
               </h3>
 
+              {post.cover_image_url && (
+                <div className="mb-3 overflow-hidden rounded-lg border border-border bg-background/40">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={post.cover_image_url}
+                    alt={post.cover_image_alt || post.title}
+                    className="h-44 w-full object-cover"
+                  />
+                </div>
+              )}
+
               <p className="text-sm text-muted-foreground leading-relaxed mb-3">
-                {truncate(post.content, 160)}
+                {post.excerpt || truncate(post.content, 160)}
               </p>
 
               {post.tags && post.tags.length > 0 && (
